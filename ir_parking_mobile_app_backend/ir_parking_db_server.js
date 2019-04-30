@@ -32,16 +32,16 @@ con.connect(err => {
 })
 
 app.get('/carinfo/:licenseplate', function (request, response) {
-  var key = request.params.licenseplate
-  console.log(key);
-  var viewCarInfo = 'SELECT c.licensePlate,CONCAT(co.carOwnerFirstName," ",co.carOwnerLastname) AS carOwnerName' + '\n' +
+  var keyLicensePlate = request.params.licenseplate
+  var viewCarInfo = 'SELECT c.carID, c.licensePlate,CONCAT(co.carOwnerFirstName," ",co.carOwnerLastname) AS carOwnerName' + '\n' +
      ',co.carOwnerTel FROM CarOwners co JOIN Car c ON co.carOwnerID = c.carOwnerID ' + '\n' +
-     'WHERE c.licensePlate LIKE '+ mySQL.escape('%' + key +'%')
+    'WHERE c.licensePlate LIKE ' + mySQL.escape('%' + keyLicensePlate +'%')
   con.query(viewCarInfo, function (err, result) {
     if (err) throw err
     response.send(result)
   })
 })
+
 
 app.get('/privileges/:location/:licenseplate' , function (request,response) {
   var keyLocation = request.params.location
@@ -65,19 +65,24 @@ app.get('/allegation' ,function(request,response){
   })
 })
 
-
-app.post('/problems', function (request, response) {
-  var keyScene = request.body.scene
-  var keyProblemDetails = request.body.problemDetails
-  console.log("Scene: ", keyScene);
-  console.log("problemDetails: ", keyProblemDetails);
-  var insertProblems = "INSERT INTO Problems(scene,evidenceImage,problemDetails,dateOfProblem,timeOfProblem,ticketID,problemTypeID,staffID)" + '\n' +
-    "VALUES(" + mySQL.escape(keyScene) + ", null," + mySQL.escape(keyProblemDetails) + ", '2019-04-24', '18:00:00', 3, 1, 2)"
-  con.query(insertProblems,function (err, result) {
+app.get('/location', function (request, response) {
+  var viewLocation = "SELECT l.locationName AS value FROM Location l"
+  con.query(viewLocation, function (err, result) {
     if (err) throw err
-    response.json(result)
+    response.send(result)
   })
 })
 
 
+app.post('/ticket', function (request, response) {
+  var keyTicketType = request.body.ticketType
+  var keyCarID = request.body.carID
+  console.log('TicketType: ',keyTicketType);
+  console.log('CarID: ' , keyCarID);
+  var createTicket = "INSERT INTO TrafficTicket(ticketType,carID) VALUES(" +  mySQL.escape(keyTicketType) +  "," + mySQL.escape(keyCarID) + ")"
+  con.query(createTicket,function (err, result) {
+    if (err) throw err
+    response.json(result)
+  })
+})
 
