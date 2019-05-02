@@ -34,7 +34,7 @@ con.connect(err => {
 app.get('/carinfo/:licenseplate', function (request, response) {
   var keyLicensePlate = request.params.licenseplate
   var viewCarInfo = 'SELECT c.carID, c.licensePlate,CONCAT(co.carOwnerFirstName," ",co.carOwnerLastname) AS carOwnerName' + '\n' +
-     ',co.carOwnerTel FROM CarOwners co JOIN Car c ON co.carOwnerID = c.carOwnerID ' + '\n' +
+     ',co.carOwnerTel, co.carOwnerEmail FROM CarOwners co JOIN Car c ON co.carOwnerID = c.carOwnerID ' + '\n' +
     'WHERE c.licensePlate LIKE ' + mySQL.escape('%' + keyLicensePlate +'%')
   con.query(viewCarInfo, function (err, result) {
     if (err) throw err
@@ -49,7 +49,7 @@ app.get('/privileges/:location/:licenseplate' , function (request,response) {
   console.log('Location: ',keyLocation);
   console.log('LicensePlate: ', keyLicensePlate);
   var viewPrivilegesOfcar = 'SELECT c.licensePlate, l.locationCode, l.locationName FROM Car c JOIN ' + '\n' + 
-    'Location l ON c.stickerID = l.stickerID WHERE l.locationName LIKE' + '\n' + mySQL.escape('%' + keyLocation + '%') + '\n' +
+    'Location l ON c.stickerID = l.stickerID WHERE l.locationName LIKE' + mySQL.escape('%' + keyLocation + '%') + '\n' +
     'AND c.licensePlate LIKE' + mySQL.escape('%' + keyLicensePlate + '%')
   con.query(viewPrivilegesOfcar, function (err, result) {
     if(err) throw err
@@ -61,6 +61,15 @@ app.get('/allegation' ,function(request,response){
   var viewAllegation = "SELECT p.allegation AS value FROM ProblemType p"
   con.query(viewAllegation,function (err,result) {
     if(err) throw err
+    response.send(result)
+  })
+})
+
+app.get('/allegationByID/:allegation', function (request, response) {
+  var keyAllegation = request.params.allegation
+  var viewAllegationID = "SELECT p.problemTypeID FROM ProblemType p WHERE p.allegation ="  + mySQL.escape(keyAllegation)  
+  con.query(viewAllegationID, function (err, result) {
+    if (err) throw err
     response.send(result)
   })
 })
@@ -85,4 +94,31 @@ app.post('/ticket', function (request, response) {
     response.json(result)
   })
 })
+
+app.get('/ticketByID', function (request, response) {
+  var viewLastTicketID = "SELECT MAX(t.ticketID) AS lastTicketID FROM TrafficTicket t"
+  con.query(viewLastTicketID, function (err, result) {
+    if (err) throw err
+    response.send(result)
+  })
+})
+
+app.post('/problem',function (request,response) {
+  var keyEvidenceImage = null
+  var keyScene = request.body.scene
+  var keyProblemDetails = request.body.problemDetails
+  var keyDateOfProblem = request.body.dateOfProblem
+  var keyTimeOfProblem = request.body.timeOfProblem
+  var keyTicketID = request.body.ticketID
+  var keyProblemTypeID = request.body.problemTypeID
+  var keyStaffID = 2
+  var createProblem = "INSERT INTO Problems(evidenceImage,scene,problemDetails,dateOfProblem,timeOfProblem,ticketID,problemTypeID,staffID) VALUES(" + '\n' +
+    mySQL.escape(keyEvidenceImage) + "," + mySQL.escape(keyScene) + "," + mySQL.escape(keyProblemDetails) + "," + mySQL.escape(keyDateOfProblem) + '\n' +
+    "," + mySQL.escape(keyTimeOfProblem) + "," + mySQL.escape(keyTicketID) + "," + mySQL.escape(keyProblemTypeID) + "," + mySQL.escape(keyStaffID) + ")"
+  con.query(createProblem, function (err, result) {
+    if (err) throw err
+    response.json(result)
+  })
+})
+
 
