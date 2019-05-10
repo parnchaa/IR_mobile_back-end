@@ -31,6 +31,19 @@ con.connect(err => {
   })
 })
 
+app.get('/staff/:email/:password' , function (request,response) {
+  var keyEmail = request.params.email
+  var keyPassword = request.params.password
+  var viewStaffInfo = 'SELECT s.staffID ,CONCAT(s.firstName," ",s.lastName) AS staffName ,s.staffEmail , ' + '\n' + 
+  's.staffRole, o.organizationName FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
+  'WHERE s.staffEmail =' + mySQL.escape(keyEmail) + ' AND s.staffPassword =' + mySQL.escape(keyPassword)
+  con.query(viewStaffInfo,function (err,result) {
+    if(err) throw err
+    response.send(result)
+  })
+})
+
+
 app.get('/carinfo/:licenseplate', function (request, response) {
   var keyLicensePlate = request.params.licenseplate
   var viewCarInfo = 'SELECT c.carID, c.licensePlate,CONCAT(co.carOwnerFirstName," ",co.carOwnerLastname) AS carOwnerName' + '\n' +
@@ -111,7 +124,8 @@ app.post('/problem',function (request,response) {
   var keyTimeOfProblem = request.body.timeOfProblem
   var keyTicketID = request.body.ticketID
   var keyProblemTypeID = request.body.problemTypeID
-  var keyStaffID = 2
+  var keyStaffID = request.body.staffID
+  console.log("staffID: " , keyStaffID);
   var createProblem = "INSERT INTO Problems(evidenceImage,scene,problemDetails,dateOfProblem,timeOfProblem,ticketID,problemTypeID,staffID) VALUES(" + '\n' +
     mySQL.escape(keyEvidenceImage) + "," + mySQL.escape(keyScene) + "," + mySQL.escape(keyProblemDetails) + "," + mySQL.escape(keyDateOfProblem) + '\n' +
     "," + mySQL.escape(keyTimeOfProblem) + "," + mySQL.escape(keyTicketID) + "," + mySQL.escape(keyProblemTypeID) + "," + mySQL.escape(keyStaffID) + ")"
