@@ -56,6 +56,17 @@ app.get('/carinfo/:licenseplate', function (request, response) {
 })
 
 
+app.get('/havecar/:licenseplate',function (request,response) {
+  var keyLicensePlate = request.params.licenseplate
+  var checkHaveCar = 'SELECT c.licensePlate FROM Car c JOIN CarOwners co ON c.carOwnerID = co.carOwnerID' + '\n' + 
+  'WHERE c.licensePlate LIKE' + mySQL.escape('%' + keyLicensePlate + '%')
+  con.query(checkHaveCar, function (err,result) {
+    if(err) throw err
+    response.send(result)
+  })
+})
+
+
 app.get('/privileges/:location/:licenseplate' , function (request,response) {
   var keyLocation = request.params.location
   var keyLicensePlate = request.params.licenseplate
@@ -70,6 +81,7 @@ app.get('/privileges/:location/:licenseplate' , function (request,response) {
   })
 })
 
+
 app.get('/allegation' ,function(request,response){
   var viewAllegation = "SELECT p.allegation AS value FROM ProblemType p"
   con.query(viewAllegation,function (err,result) {
@@ -77,6 +89,7 @@ app.get('/allegation' ,function(request,response){
     response.send(result)
   })
 })
+
 
 app.get('/allegationByID/:allegation', function (request, response) {
   var keyAllegation = request.params.allegation
@@ -86,6 +99,7 @@ app.get('/allegationByID/:allegation', function (request, response) {
     response.send(result)
   })
 })
+
 
 app.get('/location', function (request, response) {
   var viewLocation = "SELECT l.locationName AS value FROM Location l"
@@ -108,6 +122,7 @@ app.post('/ticket', function (request, response) {
   })
 })
 
+
 app.get('/ticketByID', function (request, response) {
   var viewLastTicketID = "SELECT MAX(t.ticketID) AS lastTicketID FROM TrafficTicket t"
   con.query(viewLastTicketID, function (err, result) {
@@ -115,6 +130,23 @@ app.get('/ticketByID', function (request, response) {
     response.send(result)
   })
 })
+
+
+app.post('/guestCar',function (request,response) {
+  var keyLicensePlate = request.body.licensePlate
+  var keyProvince = request.body.province
+  var keyCarColor = request.body.carColor
+  var keyCarBrand = request.body.carBrand
+  var keyCarModel = request.body.carModel
+  var insertGuestCar = "INSERT INTO Car(licensePlate,province,carColor,carBrand,carModel,countProblems,carOwnerID,stickerID) VALUES" + '\n' +
+    "(" + mySQL.escape(keyLicensePlate) + "," + mySQL.escape(keyProvince) + "," + mySQL.escape(keyCarColor) + "," + mySQL.escape(keyCarBrand) + "," + '\n' +
+    mySQL.escape(keyCarModel) + ",1,1,1)"
+  con.query(insertGuestCar,function (err,result) {
+    if (err) throw err
+    response.json(result)
+  })
+})
+
 
 app.post('/problem',function (request,response) {
   var keyEvidenceImage = null
@@ -125,7 +157,6 @@ app.post('/problem',function (request,response) {
   var keyTicketID = request.body.ticketID
   var keyProblemTypeID = request.body.problemTypeID
   var keyStaffID = request.body.staffID
-  console.log("staffID: " , keyStaffID);
   var createProblem = "INSERT INTO Problems(evidenceImage,scene,problemDetails,dateOfProblem,timeOfProblem,ticketID,problemTypeID,staffID) VALUES(" + '\n' +
     mySQL.escape(keyEvidenceImage) + "," + mySQL.escape(keyScene) + "," + mySQL.escape(keyProblemDetails) + "," + mySQL.escape(keyDateOfProblem) + '\n' +
     "," + mySQL.escape(keyTimeOfProblem) + "," + mySQL.escape(keyTicketID) + "," + mySQL.escape(keyProblemTypeID) + "," + mySQL.escape(keyStaffID) + ")"
