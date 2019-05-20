@@ -1,16 +1,9 @@
 var mySQL = require('mysql')
 var express = require('express')
-// var session = require('express-session')
-// var path = require('path')
 var cors = require('cors')
 var body = require('body-parser')
 var app = express()
 
-// app.use(session({
-//   secret: 'secret',
-//   resave: true,
-//   saveUninitialized: true
-// }))
 app.use(cors())
 app.use(body())
 app.use(body.urlencoded({ extended: true }))
@@ -70,12 +63,24 @@ app.get('/havecar/:licenseplate',function (request,response) {
 app.get('/privileges/:location/:licenseplate' , function (request,response) {
   var keyLocation = request.params.location
   var keyLicensePlate = request.params.licenseplate
-  console.log('Location: ',keyLocation);
-  console.log('LicensePlate: ', keyLicensePlate);
   var viewPrivilegesOfcar = 'SELECT c.licensePlate, l.locationCode, l.locationName FROM Car c JOIN ' + '\n' + 
     'Location l ON c.stickerID = l.stickerID WHERE l.locationName LIKE' + mySQL.escape('%' + keyLocation + '%') + '\n' +
     'AND c.licensePlate LIKE' + mySQL.escape('%' + keyLicensePlate + '%')
   con.query(viewPrivilegesOfcar, function (err, result) {
+    if(err) throw err
+    response.send(result)
+  })
+})
+
+
+app.get('/checkMaxWarning/:licenseplate/:allegation',function (request,response) {
+  var keyLicensePlate = request.params.licenseplate
+  var keyAllegation = request.params.allegation
+  var checkMaxWarning = "SELECT c.licensePlate, COUNT(t.carID) AS NumOfTicketOfCar, pt.allegation, i.maxWarning , i.price" + '\n' +
+    "FROM TrafficTicket t JOIN Problems p ON t.ticketID = p.ticketID JOIN ProblemType pt ON p.problemTypeID = pt.problemTypeID" + '\n' +
+    "JOIN InternalRules i ON pt.problemTypeID = i.problemTypeID JOIN Car c ON t.carID = c.carID" + '\n' +
+    "WHERE c.licensePlate =" + mySQL.escape(keyLicensePlate) + "AND pt.allegation =" + mySQL.escape(keyAllegation) + "AND t.ticketType = 'ใบเตือน'"  
+  con.query(checkMaxWarning,function (err,result) {
     if(err) throw err
     response.send(result)
   })
@@ -113,8 +118,6 @@ app.get('/location', function (request, response) {
 app.post('/ticket', function (request, response) {
   var keyTicketType = request.body.ticketType
   var keyCarID = request.body.carID
-  console.log('TicketType: ',keyTicketType);
-  console.log('CarID: ' , keyCarID);
   var createTicket = "INSERT INTO TrafficTicket(ticketType,carID) VALUES(" +  mySQL.escape(keyTicketType) +  "," + mySQL.escape(keyCarID) + ")"
   con.query(createTicket,function (err, result) {
     if (err) throw err
