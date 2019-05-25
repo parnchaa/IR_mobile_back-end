@@ -28,7 +28,7 @@ app.get('/staff/:email/:password' , function (request,response) {
   var keyEmail = request.params.email
   var keyPassword = request.params.password
   var viewStaffInfo = 'SELECT s.staffID ,CONCAT(s.firstName," ",s.lastName) AS staffName ,s.staffEmail , ' + '\n' + 
-  's.staffRole, o.organizationName FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
+  's.staffRole, o.organizationName, s.staffImages FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
   'WHERE s.staffEmail =' + mySQL.escape(keyEmail) + ' AND s.staffPassword =' + mySQL.escape(keyPassword)
   con.query(viewStaffInfo,function (err,result) {
     if(err) throw err
@@ -141,9 +141,9 @@ app.post('/guestCar',function (request,response) {
   var keyCarColor = request.body.carColor
   var keyCarBrand = request.body.carBrand
   var keyCarModel = request.body.carModel
-  var insertGuestCar = "INSERT INTO Car(licensePlate,province,carColor,carBrand,carModel,countProblems,carOwnerID,stickerID) VALUES" + '\n' +
+  var insertGuestCar = "INSERT INTO Car(licensePlate,province,carColor,carBrand,carModel,carOwnerID,stickerID) VALUES" + '\n' +
     "(" + mySQL.escape(keyLicensePlate) + "," + mySQL.escape(keyProvince) + "," + mySQL.escape(keyCarColor) + "," + mySQL.escape(keyCarBrand) + "," + '\n' +
-    mySQL.escape(keyCarModel) + ",1,1,1)"
+    mySQL.escape(keyCarModel) + ",1,1)"
   con.query(insertGuestCar,function (err,result) {
     if (err) throw err
     response.json(result)
