@@ -1,8 +1,9 @@
-var mySQL = require('mysql')
-var express = require('express')
-var cors = require('cors')
-var body = require('body-parser')
-var app = express()
+let mySQL = require('mysql')
+let express = require('express')
+let cors = require('cors')
+let body = require('body-parser')
+let app = express()
+let nodemailer = require('nodemailer');
 require('dotenv').config()
 
 app.use(cors())
@@ -28,8 +29,8 @@ var con = mySQL.createConnection({
 
 con.connect(err => {
   if (err) throw err
-  app.listen(3000, () => {
-    console.log('Start server at port 3000.')
+  app.listen(8080, () => {
+    console.log('Start server at port 8080.')
   })
 
   app.get('/staff/:email/:password', function (request, response) {
@@ -158,7 +159,6 @@ con.connect(err => {
     })
   })
 
-
   app.post('/problem', function (request, response) {
     var keyEvidenceImage = request.body.evidenceImage
     var keyScene = request.body.scene
@@ -175,6 +175,69 @@ con.connect(err => {
       if (err) throw err
       response.json(result)
     })
+  })
+
+  app.post('/sendEmail', function (request, response) {
+    // let keyFrom
+    let keyTo = request.body.to;
+    let keySubject = request.body.subject;
+    let keyAllegation = request.body.allegation;
+    let keyProblemDetails = request.body.problemDetails;
+    let keyPriceOfProblem = request.body.priceOfProblem;
+    let keyScene = request.body.scene;
+    let keyDate = request.body.date;
+    let keyTime = request.body.time;
+    let keyImageEvidence = request.body.imageEvidence;
+    
+    console.log("prepared to send email");
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      secureConnection: true,
+      auth: {
+        user: 'centerirparking@gmail.com',
+        pass: 'basjparn'
+      },
+      tls: {
+        secureProtocol: "TLSv1_method"
+      }
+    });
+
+    // const transporter = nodemailer.createTransport({
+    //   host: "gmail",
+    //   secureConnection: true,
+    //   port: 465,
+    //   auth: {
+    //     user:'centerirparking@gmail.com',
+    //     pass:'basjparn'
+    //   },
+    //   tls: {
+    //     secureProtocol: "TLSv1_method"
+    //   }
+    // });
+    
+
+    let mailOptions = {
+      from: '"ฝ่ายอาคารและสถานที่ มจธ." <centerirparking@gmail.com>',
+      to: keyTo,             
+      subject: keySubject,            
+      html: 
+      `<h3 style="font-weight: 700">คุณกระทำความผิดข้อหา: <span style="font-weight: 200">${keyAllegation}</span></h3>` + '\n' + 
+      `<h3 style="font-weight: 700">รายละเอียดข้อหาเพิ่มเติม: <span style="font-weight: 200">${keyProblemDetails}</span></h3>` + '\n' + 
+      `<h3 style="font-weight: 700">ค่าปรับ: <span style="font-weight: 200">${keyPriceOfProblem}</span></h3>` + '\n' + 
+      `<h3 style="font-weight: 700">สถานที่: <span style="font-weight: 200">${keyScene}</span></h3>` + '\n' + 
+      `<h3 style="font-weight: 700">วัน: <span style="font-weight: 200">${keyDate}</span></h3>` + "   " + `<h3 style="font-weight: 700">เวลา: <span style="font-weight: 200">${keyTime}</span></h3>` + '\n' +
+      `<h3 style="font-weight: 700">ภาพถ่ายหลักฐาน: </h5>` + '\n' + 
+      `<img src="${keyImageEvidence}" width="100%" height="85%" />`
+    };
+
+    transporter.sendMail(mailOptions, function (err, info) {
+      if(err)
+        console.log(err)
+      else
+        response.json(info.response)
+   });
+
   })
 
 })
