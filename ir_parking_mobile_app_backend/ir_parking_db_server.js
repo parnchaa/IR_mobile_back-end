@@ -4,13 +4,13 @@ let cors = require('cors')
 let body = require('body-parser')
 let app = express()
 let nodemailer = require('nodemailer');
+
 require('dotenv').config()
 
 app.use(cors())
 app.use(body())
 app.use(body.urlencoded({ extended: true }))
 app.use(body.json())
-
 
 // var con = mySQL.createConnection({
 //   host: process.env.DB_HOST,
@@ -20,7 +20,8 @@ app.use(body.json())
 // })
 
 var con = mySQL.createConnection({
-  host: "52.221.203.102",
+  // host: "52.221.203.102",
+  host: "35.247.180.61",
   user: "parn",
   password: "irdb2019",
   database: "ir_parking"
@@ -68,11 +69,10 @@ con.connect(err => {
     })
   })
 
-
   app.get('/privileges/:location/:licenseplate', function (request, response) {
     var keyLocation = request.params.location
     var keyLicensePlate = request.params.licenseplate
-    var viewPrivilegesOfcar = 'SELECT c.licensePlate, l.locationCode, l.locationName FROM Car c JOIN ' + '\n' +
+    var viewPrivilegesOfcar = 'SELECT c.licensePlate, l.locationName FROM Car c JOIN ' + '\n' +
       'Location l ON c.stickerID = l.stickerID WHERE l.locationName LIKE' + mySQL.escape('%' + keyLocation + '%') + '\n' +
       'AND c.licensePlate LIKE' + mySQL.escape('%' + keyLicensePlate + '%')
     con.query(viewPrivilegesOfcar, function (err, result) {
@@ -114,15 +114,23 @@ con.connect(err => {
     })
   })
 
-
-  app.get('/location', function (request, response) {
-    var viewLocation = "SELECT l.locationName AS value FROM Location l"
-    con.query(viewLocation, function (err, result) {
+  app.get('/allLocationPolygon', function (request, response) {
+    var viewAllLocationPolygon = "SELECT l.locationCode FROM Location l"
+    con.query(viewAllLocationPolygon, function (err, result) {
       if (err) throw err
       response.send(result)
     })
   })
 
+  app.get('/locationPolygon/:latitude', function (request, response) {
+    var keyLatitude = request.params.latitude
+    var viewAllLocationPolygon = "SELECT l.locationName, l.locationCode FROM Location l WHERE l.locationCode LIKE " + '\n' + 
+    mySQL.escape('%' + keyLatitude + '%')
+    con.query(viewAllLocationPolygon, function (err, result) {
+      if (err) throw err
+      response.send(result)
+    })
+  })
 
   app.post('/ticket', function (request, response) {
     var keyTicketType = request.body.ticketType
@@ -202,20 +210,6 @@ con.connect(err => {
         secureProtocol: "TLSv1_method"
       }
     });
-
-    // const transporter = nodemailer.createTransport({
-    //   host: "gmail",
-    //   secureConnection: true,
-    //   port: 465,
-    //   auth: {
-    //     user:'centerirparking@gmail.com',
-    //     pass:'basjparn'
-    //   },
-    //   tls: {
-    //     secureProtocol: "TLSv1_method"
-    //   }
-    // });
-    
 
     let mailOptions = {
       from: '"ฝ่ายอาคารและสถานที่ มจธ." <centerirparking@gmail.com>',
