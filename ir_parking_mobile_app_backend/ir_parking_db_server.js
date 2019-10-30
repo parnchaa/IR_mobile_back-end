@@ -1,9 +1,10 @@
-let mySQL = require('mysql')
-let express = require('express')
-let cors = require('cors')
-let body = require('body-parser')
-let app = express()
-let nodemailer = require('nodemailer');
+const mySQL = require('mysql')
+const express = require('express')
+const cors = require('cors')
+const body = require('body-parser')
+const app = express()
+const nodemailer = require('nodemailer');
+const bcrypt = require('bcrypt');
 
 require('dotenv').config()
 
@@ -12,21 +13,12 @@ app.use(body())
 app.use(body.urlencoded({ extended: true }))
 app.use(body.json())
 
-// var con = mySQL.createConnection({
-//   host: process.env.DB_HOST,
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-//   database: process.env.DB_DATABASE
-// })
-
-var con = mySQL.createConnection({
-  // host: "52.221.203.102",
-  host: "35.247.180.61",
-  user: "parn",
-  password: "irdb2019",
-  database: "ir_parking"
+let con = mySQL.createConnection({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE
 })
-
 
 con.connect(err => {
   if (err) throw err
@@ -34,22 +26,90 @@ con.connect(err => {
     console.log('Start server at port 8080.')
   })
 
-  app.get('/staff/:email/:password', function (request, response) {
-    var keyEmail = request.params.email
-    var keyPassword = request.params.password
-    var viewStaffInfo = 'SELECT s.staffID ,CONCAT(s.firstName," ",s.lastName) AS staffName ,s.staffEmail , ' + '\n' +
-      's.staffRole, o.organizationName, s.staffImages FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
-      'WHERE s.staffEmail =' + mySQL.escape(keyEmail) + ' AND s.staffPassword =' + mySQL.escape(keyPassword)
-    con.query(viewStaffInfo, function (err, result) {
-      if (err) throw err
-      response.send(result)
-    })
-  })
+  // -------------------------------- login ----------------------------------------- //
 
+  const jwt = require("jwt-simple");
+  const passport = require("passport");
+  const ExtractJwt = require("passport-jwt").ExtractJwt;
+  const JwtStrategy = require("passport-jwt").Strategy;
+  const SECRET = process.env.SECRET_KEY;
+
+  const jwtOptions = {
+    jwtFromRequest: ExtractJwt.fromHeader("authorization"),
+    secretOrKey: SECRET
+  };
+
+  const jwtAuth = new JwtStrategy(jwtOptions, (payload, done) => {
+    if (payload.sub !== undefined) done(null, true);
+    else done(null, false);
+  });
+
+  passport.use(jwtAuth);
+
+  const loginMiddleWare = (request, response, next) => {
+    let keyEmail = request.body.email
+    let cipherPassword = 'SELECT s.staffPassword FROM Staffs s WHERE s.staffEmail =' + mySQL.escape(keyEmail)
+
+    con.query(cipherPassword, function (err, result) {
+      if (err) throw err
+      let hashPassword = result[0].staffPassword
+      let macth = bcrypt.compareSync(request.body.password, hashPassword)
+      if (macth) {
+
+        let viewStaffInfo = 'SELECT CONCAT(s.firstName," ",s.lastName) AS staffName FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
+        'WHERE s.staffEmail =' + mySQL.escape(keyEmail) + ' AND s.staffPassword =' + mySQL.escape(hashPassword)
+        
+        con.query(viewStaffInfo, function (err, result) {
+          if (err) throw err
+          
+          if (result[0] != null) {
+            next();
+          }else{
+            response.json("WrongEmailOrPassword");
+          }
+        })
+      }else{
+        response.json("WrongEmailOrPassword");
+      }
+    })
+  };
+
+  app.post("/authentication", loginMiddleWare, (request, response) => {
+   const payload = {
+      sub: request.body.email,
+      iat: new Date().getTime()
+   };
+   let token = jwt.encode(payload, SECRET);
+   response.json(token);
+  });
+
+  const requireJWTAuth = passport.authenticate("jwt", {session:false});
+
+  app.get("/staff/:email/:password", requireJWTAuth, (request, response) => {
+    let keyEmail = request.params.email
+    let cipherPassword = 'SELECT s.staffPassword FROM Staffs s WHERE s.staffEmail =' + mySQL.escape(keyEmail)
+
+    con.query(cipherPassword, function (err, result) {
+      if (err) throw err
+      let hashPassword = result[0].staffPassword
+
+      let viewStaffInfo = 'SELECT s.staffID ,CONCAT(s.firstName," ",s.lastName) AS staffName ,s.staffEmail , ' + '\n' +
+      's.staffRole, o.organizationName, s.staffImages FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
+      'WHERE s.staffEmail =' + mySQL.escape(keyEmail) + ' AND s.staffPassword =' + mySQL.escape(hashPassword)
+
+      con.query(viewStaffInfo, function (err, result) {
+        if (err) throw err
+        response.send(result)
+      })
+      
+    })
+  });
+  
+  // -------------------------------- login ----------------------------------------- //
 
   app.get('/carinfo/:licenseplate', function (request, response) {
-    var keyLicensePlate = request.params.licenseplate
-    var viewCarInfo = 'SELECT c.carID, c.licensePlate,CONCAT(co.carOwnerFirstName," ",co.carOwnerLastname) AS carOwnerName' + '\n' +
+    let keyLicensePlate = request.params.licenseplate
+    let viewCarInfo = 'SELECT c.carID, c.licensePlate,CONCAT(co.carOwnerFirstName," ",co.carOwnerLastname) AS carOwnerName' + '\n' +
       ',co.carOwnerTel, co.carOwnerEmail FROM CarOwners co JOIN Car c ON co.carOwnerID = c.carOwnerID ' + '\n' +
       'WHERE c.licensePlate LIKE ' + mySQL.escape('%' + keyLicensePlate + '%')
     con.query(viewCarInfo, function (err, result) {
@@ -60,8 +120,8 @@ con.connect(err => {
 
 
   app.get('/havecar/:licenseplate', function (request, response) {
-    var keyLicensePlate = request.params.licenseplate
-    var checkHaveCar = 'SELECT c.licensePlate FROM Car c JOIN CarOwners co ON c.carOwnerID = co.carOwnerID' + '\n' +
+    let keyLicensePlate = request.params.licenseplate
+    let checkHaveCar = 'SELECT c.licensePlate FROM Car c JOIN CarOwners co ON c.carOwnerID = co.carOwnerID' + '\n' +
       'WHERE c.licensePlate LIKE' + mySQL.escape('%' + keyLicensePlate + '%')
     con.query(checkHaveCar, function (err, result) {
       if (err) throw err
@@ -70,9 +130,9 @@ con.connect(err => {
   })
 
   app.get('/privileges/:location/:licenseplate', function (request, response) {
-    var keyLocation = request.params.location
-    var keyLicensePlate = request.params.licenseplate
-    var viewPrivilegesOfcar = 'SELECT c.licensePlate, l.locationName FROM Car c JOIN ' + '\n' +
+    let keyLocation = request.params.location
+    let keyLicensePlate = request.params.licenseplate
+    let viewPrivilegesOfcar = 'SELECT c.licensePlate, l.locationName FROM Car c JOIN ' + '\n' +
       'Location l ON c.stickerID = l.stickerID WHERE l.locationName LIKE' + mySQL.escape('%' + keyLocation + '%') + '\n' +
       'AND c.licensePlate LIKE' + mySQL.escape('%' + keyLicensePlate + '%')
     con.query(viewPrivilegesOfcar, function (err, result) {
@@ -83,9 +143,9 @@ con.connect(err => {
 
 
   app.get('/checkMaxWarning/:licenseplate/:allegation', function (request, response) {
-    var keyLicensePlate = request.params.licenseplate
-    var keyAllegation = request.params.allegation
-    var checkMaxWarning = "SELECT c.licensePlate, COUNT(t.carID) AS NumOfTicketOfCar, pt.allegation, i.maxWarning , i.price" + '\n' +
+    let keyLicensePlate = request.params.licenseplate
+    let keyAllegation = request.params.allegation
+    let checkMaxWarning = "SELECT c.licensePlate, COUNT(t.carID) AS NumOfTicketOfCar, pt.allegation, i.maxWarning , i.price" + '\n' +
       "FROM TrafficTicket t JOIN Problems p ON t.ticketID = p.ticketID JOIN ProblemType pt ON p.problemTypeID = pt.problemTypeID" + '\n' +
       "JOIN InternalRules i ON pt.problemTypeID = i.problemTypeID JOIN Car c ON t.carID = c.carID" + '\n' +
       "WHERE c.licensePlate =" + mySQL.escape(keyLicensePlate) + "AND pt.allegation =" + mySQL.escape(keyAllegation) + "AND t.ticketType = 'ใบเตือน'"
@@ -97,7 +157,7 @@ con.connect(err => {
 
 
   app.get('/allegation', function (request, response) {
-    var viewAllegation = "SELECT p.allegation AS value FROM ProblemType p"
+    let viewAllegation = "SELECT p.allegation AS value FROM ProblemType p"
     con.query(viewAllegation, function (err, result) {
       if (err) throw err
       response.send(result)
@@ -106,8 +166,8 @@ con.connect(err => {
 
 
   app.get('/allegationByID/:allegation', function (request, response) {
-    var keyAllegation = request.params.allegation
-    var viewAllegationID = "SELECT p.problemTypeID FROM ProblemType p WHERE p.allegation =" + mySQL.escape(keyAllegation)
+    let keyAllegation = request.params.allegation
+    let viewAllegationID = "SELECT p.problemTypeID FROM ProblemType p WHERE p.allegation =" + mySQL.escape(keyAllegation)
     con.query(viewAllegationID, function (err, result) {
       if (err) throw err
       response.send(result)
@@ -115,7 +175,7 @@ con.connect(err => {
   })
 
   app.get('/allLocationPolygon', function (request, response) {
-    var viewAllLocationPolygon = "SELECT l.locationCode FROM Location l"
+    let viewAllLocationPolygon = "SELECT l.locationCode FROM Location l"
     con.query(viewAllLocationPolygon, function (err, result) {
       if (err) throw err
       response.send(result)
@@ -123,8 +183,8 @@ con.connect(err => {
   })
 
   app.get('/locationPolygon/:latitude', function (request, response) {
-    var keyLatitude = request.params.latitude
-    var viewAllLocationPolygon = "SELECT l.locationName, l.locationCode FROM Location l WHERE l.locationCode LIKE " + '\n' + 
+    let keyLatitude = request.params.latitude
+    let viewAllLocationPolygon = "SELECT l.locationName, l.locationCode FROM Location l WHERE l.locationCode LIKE " + '\n' + 
     mySQL.escape('%' + keyLatitude + '%')
     con.query(viewAllLocationPolygon, function (err, result) {
       if (err) throw err
@@ -133,9 +193,9 @@ con.connect(err => {
   })
 
   app.post('/ticket', function (request, response) {
-    var keyTicketType = request.body.ticketType
-    var keyCarID = request.body.carID
-    var createTicket = "INSERT INTO TrafficTicket(ticketType,carID) VALUES(" + mySQL.escape(keyTicketType) + "," + mySQL.escape(keyCarID) + ")"
+    let keyTicketType = request.body.ticketType
+    let keyCarID = request.body.carID
+    let createTicket = "INSERT INTO TrafficTicket(ticketType,carID) VALUES(" + mySQL.escape(keyTicketType) + "," + mySQL.escape(keyCarID) + ")"
     con.query(createTicket, function (err, result) {
       if (err) throw err
       response.json(result)
@@ -144,7 +204,7 @@ con.connect(err => {
 
 
   app.get('/ticketByID', function (request, response) {
-    var viewLastTicketID = "SELECT MAX(t.ticketID) AS lastTicketID FROM TrafficTicket t"
+    let viewLastTicketID = "SELECT MAX(t.ticketID) AS lastTicketID FROM TrafficTicket t"
     con.query(viewLastTicketID, function (err, result) {
       if (err) throw err
       response.send(result)
@@ -153,12 +213,12 @@ con.connect(err => {
 
 
   app.post('/guestCar', function (request, response) {
-    var keyLicensePlate = request.body.licensePlate
-    var keyProvince = request.body.province
-    var keyCarColor = request.body.carColor
-    var keyCarBrand = request.body.carBrand
-    var keyCarModel = request.body.carModel
-    var insertGuestCar = "INSERT INTO Car(licensePlate,province,carColor,carBrand,carModel,carOwnerID,stickerID) VALUES" + '\n' +
+    let keyLicensePlate = request.body.licensePlate
+    let keyProvince = request.body.province
+    let keyCarColor = request.body.carColor
+    let keyCarBrand = request.body.carBrand
+    let keyCarModel = request.body.carModel
+    let insertGuestCar = "INSERT INTO Car(licensePlate,province,carColor,carBrand,carModel,carOwnerID,stickerID) VALUES" + '\n' +
       "(" + mySQL.escape(keyLicensePlate) + "," + mySQL.escape(keyProvince) + "," + mySQL.escape(keyCarColor) + "," + mySQL.escape(keyCarBrand) + "," + '\n' +
       mySQL.escape(keyCarModel) + ",1,1)"
     con.query(insertGuestCar, function (err, result) {
@@ -168,15 +228,15 @@ con.connect(err => {
   })
 
   app.post('/problem', function (request, response) {
-    var keyEvidenceImage = request.body.evidenceImage
-    var keyScene = request.body.scene
-    var keyProblemDetails = request.body.problemDetails
-    var keyDateOfProblem = request.body.dateOfProblem
-    var keyTimeOfProblem = request.body.timeOfProblem
-    var keyTicketID = request.body.ticketID
-    var keyProblemTypeID = request.body.problemTypeID
-    var keyStaffID = request.body.staffID
-    var createProblem = "INSERT INTO Problems(evidenceImage,scene,problemDetails,dateOfProblem,timeOfProblem,ticketID,problemTypeID,staffID) VALUES(" + '\n' +
+    let keyEvidenceImage = request.body.evidenceImage
+    let keyScene = request.body.scene
+    let keyProblemDetails = request.body.problemDetails
+    let keyDateOfProblem = request.body.dateOfProblem
+    let keyTimeOfProblem = request.body.timeOfProblem
+    let keyTicketID = request.body.ticketID
+    let keyProblemTypeID = request.body.problemTypeID
+    let keyStaffID = request.body.staffID
+    let createProblem = "INSERT INTO Problems(evidenceImage,scene,problemDetails,dateOfProblem,timeOfProblem,ticketID,problemTypeID,staffID) VALUES(" + '\n' +
       mySQL.escape(keyEvidenceImage) + "," + mySQL.escape(keyScene) + "," + mySQL.escape(keyProblemDetails) + "," + mySQL.escape(keyDateOfProblem) + '\n' +
       "," + mySQL.escape(keyTimeOfProblem) + "," + mySQL.escape(keyTicketID) + "," + mySQL.escape(keyProblemTypeID) + "," + mySQL.escape(keyStaffID) + ")"
     con.query(createProblem, function (err, result) {
