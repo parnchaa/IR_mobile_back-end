@@ -85,24 +85,17 @@ con.connect(err => {
 
   const requireJWTAuth = passport.authenticate("jwt", {session:false});
 
-  app.get("/staff/:email/:password", requireJWTAuth, (request, response) => {
+  app.get("/staff/:email", requireJWTAuth, (request, response) => {
     let keyEmail = request.params.email
-    let cipherPassword = 'SELECT s.staffPassword FROM Staffs s WHERE s.staffEmail =' + mySQL.escape(keyEmail)
-
-    con.query(cipherPassword, function (err, result) {
-      if (err) throw err
-      let hashPassword = result[0].staffPassword
-
-      let viewStaffInfo = 'SELECT s.staffID ,CONCAT(s.firstName," ",s.lastName) AS staffName ,s.staffEmail , ' + '\n' +
+    let viewStaffInfo = 'SELECT s.staffID ,CONCAT(s.firstName," ",s.lastName) AS staffName ,s.staffEmail , ' + '\n' +
       's.staffRole, o.organizationName, s.staffImages FROM Staffs s JOIN Organizations o ON s.organizationID = o.organizationID' + '\n' +
-      'WHERE s.staffEmail =' + mySQL.escape(keyEmail) + ' AND s.staffPassword =' + mySQL.escape(hashPassword)
+      'WHERE s.staffEmail =' + mySQL.escape(keyEmail)
 
       con.query(viewStaffInfo, function (err, result) {
         if (err) throw err
         response.send(result)
       })
       
-    })
   });
   
   // -------------------------------- login ----------------------------------------- //
